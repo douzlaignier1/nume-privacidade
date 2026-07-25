@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nume — Conectar seu WhatsApp</title>
+  <meta name="description" content="Conecte o WhatsApp Business da sua empresa à plataforma de atendimento da Nume.">
+  <style>
+    :root { --preto:#111; --pessego:#F0C078; --cinza:#f4f4f4; --texto:#222; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif; color:var(--texto); line-height:1.6; }
+    .wrap { max-width:760px; margin:0 auto; padding:0 24px; }
+    header { padding:28px 0; border-bottom:1px solid #eee; }
+    .logo { display:flex; align-items:center; gap:12px; font-weight:800; font-size:1.4rem; letter-spacing:1px; }
+    .logo .dot { color:var(--pessego); }
+    .hero { padding:56px 0 32px; text-align:center; background:linear-gradient(180deg,#fff, var(--cinza)); }
+    .hero h1 { font-size:2.1rem; line-height:1.2; margin-bottom:16px; }
+    .hero h1 .hl { background:var(--pessego); padding:0 8px; border-radius:6px; }
+    .hero p { font-size:1.1rem; color:#555; max-width:560px; margin:0 auto; }
+    section { padding:40px 0 64px; }
+    .steps { max-width:560px; margin:0 auto 36px; }
+    .step { display:flex; gap:18px; padding:16px 0; border-bottom:1px solid #eee; align-items:flex-start; }
+    .step .n { flex:0 0 38px; height:38px; border-radius:50%; background:var(--preto); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+    .step p { color:#444; }
+    .cta { text-align:center; }
+    .btn { display:inline-block; background:var(--preto); color:#fff; padding:16px 40px; border-radius:8px; border:none; font-size:1.05rem; font-weight:600; cursor:pointer; }
+    .btn:disabled { background:#999; cursor:wait; }
+    #status { margin:28px auto 0; max-width:560px; padding:16px 20px; border-radius:10px; font-size:.98rem; display:none; }
+    #status.info { display:block; background:var(--cinza); color:#333; }
+    #status.ok { display:block; background:#e8f6e8; color:#1b5e20; }
+    #status.err { display:block; background:#fdecea; color:#b71c1c; }
+    footer { border-top:1px solid #eee; padding:32px 0; color:#666; font-size:.9rem; text-align:center; }
+    footer a { color:#555; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap"><div class="logo">N<span class="dot">.</span>&nbsp;nume</div></div>
+  </header>
+
+  <div class="hero">
+    <div class="wrap">
+      <h1>Conectar o WhatsApp da sua empresa <span class="hl">à Nume</span></h1>
+      <p>Sua equipe continua atendendo pelo aplicativo WhatsApp Business no celular, normalmente. A conexão apenas registra as conversas na plataforma da Nume.</p>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <div class="steps">
+        <div class="step"><div class="n">1</div><p>Clique em <strong>Conectar WhatsApp</strong> e entre com o Facebook da empresa.</p></div>
+        <div class="step"><div class="n">2</div><p>Escolha <strong>"Conectar sua conta existente do WhatsApp Business"</strong> e informe o número usado no aplicativo.</p></div>
+        <div class="step"><div class="n">3</div><p>No celular, abra o WhatsApp Business, toque em <strong>Conectar</strong> e confirme. Pronto — nada muda no dia a dia do atendimento.</p></div>
+      </div>
+      <div class="cta">
+        <button id="connect" class="btn" disabled>Carregando…</button>
+        <div id="status"></div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      Nume · MTK DOUGLAS LTDA · <a href="https://douzlaignier1.github.io/nume-privacidade/">Política de Privacidade</a>
+    </div>
+  </footer>
+
+  <script>
+    var APP_ID = '2477879986006892';
+    var CONFIG_ID = '2109866079928348';
+    var EXCHANGE_URL = 'https://n8n.mktnume.tech/webhook/nume-es-exchange';
+
+    var sessionInfo = null;   // último evento WA_EMBEDDED_SIGNUP recebido
+    var btn = document.getElementById('connect');
+    var statusEl = document.getElementById('status');
+
+    function setStatus(cls, msg) { statusEl.className = cls; statusEl.textContent = msg; }
+
+    // Session logging: captura o session info do fluxo (obrigatório p/ coexistence)
+    window.addEventListener('message', function (event) {
+      if (typeof event.origin !== 'string' || !/\.facebook\.com$/.test(new URL(event.origin).hostname) ) {
+        if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
+      }
+      try {
+        var data = JSON.parse(event.data);
+        if (data.type === 'WA_EMBEDDED_SIGNUP') {
+          sessionInfo = data;
+          if (data.event === 'CANCEL' || data.event === 'CLOSE') {
+            setStatus('info', 'Fluxo fechado antes de concluir. Você pode tentar de novo quando quiser.');
+          }
+        }
+      } catch (e) { /* mensagens de outros widgets — ignorar */ }
+    });
+
+    window.fbAsyncInit = function () {
+      FB.init({ appId: APP_ID, autoLogAppEvents: true, xfbml: true, version: 'v25.0' });
+      btn.disabled = false;
+      btn.textContent = 'Conectar WhatsApp';
+    };
+
+    function waitSessionInfo(maxMs) {
+      return new Promise(function (resolve) {
+        var waited = 0;
+        (function poll() {
+          if (sessionInfo && sessionInfo.event && sessionInfo.event.indexOf('FINISH') === 0) return resolve(sessionInfo);
+          if (waited >= maxMs) return resolve(sessionInfo);
+          waited += 150; setTimeout(poll, 150);
+        })();
+      });
+    }
+
+    function fbLoginCallback(response) {
+      if (response && response.authResponse && response.authResponse.code) {
+        var code = response.authResponse.code; // validade ~30s: enviar já
+        setStatus('info', 'Conexão autorizada. Finalizando a configuração…');
+        waitSessionInfo(2500).then(function (si) {
+          var d = (si && si.data) || {};
+          fetch(EXCHANGE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code: code,
+              waba_id: d.waba_id || null,
+              phone_number_id: d.phone_number_id || null,
+              session_info: si
+            })
+          }).then(function (r) { return r.json(); }).then(function (res) {
+            if (res && res.ok) {
+              setStatus('ok', 'WhatsApp conectado com sucesso! Pode fechar esta página — o restante é com a Nume.');
+            } else {
+              setStatus('err', 'A conexão foi autorizada, mas houve um erro ao finalizar (' + ((res && res.error) || 'erro desconhecido') + '). Avise a Nume — resolvemos do nosso lado.');
+            }
+          }).catch(function () {
+            setStatus('err', 'A conexão foi autorizada, mas não conseguimos falar com o servidor da Nume. Avise a equipe — resolvemos do nosso lado.');
+          });
+        });
+      } else {
+        setStatus('info', 'Conexão não concluída. Você pode tentar novamente.');
+      }
+    }
+
+    document.getElementById('connect').addEventListener('click', function () {
+      setStatus('info', 'Abrindo o fluxo do WhatsApp…');
+      sessionInfo = null;
+      FB.login(fbLoginCallback, {
+        config_id: CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { setup: {}, sessionInfoVersion: '3' }
+      });
+    });
+  </script>
+  <script async defer crossorigin="anonymous" src="https://connect.facebook.net/en_US/sdk.js"></script>
+</body>
+</html>
